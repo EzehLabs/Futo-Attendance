@@ -1,0 +1,3 @@
+RewriteEngine On
+
+RewriteRule ^cdata$ cdata.php [L]

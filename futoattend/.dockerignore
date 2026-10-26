@@ -1,0 +1,6 @@
+.env
+.git
+.gitignore
+.vscode
+**/adms_debug.log
+**/*.log

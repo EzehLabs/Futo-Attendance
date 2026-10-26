@@ -1,0 +1,9 @@
+<?php
+function envv(string $key, ?string $default=null): ?string { static $env=null; if($env===null){$env=[]; if(is_file(__DIR__.'/../.env')) foreach(file(__DIR__.'/../.env', FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) as $line){$line=trim($line); if($line===''||$line[0]==='#'||!str_contains($line,'='))continue; [$k,$v]=explode('=',$line,2); $env[trim($k)]=trim($v," \"'");}} return $env[$key] ?? getenv($key) ?: $default; }
+function db(): PDO { static $pdo; if($pdo) return $pdo; $pdo=new PDO('mysql:host='.envv('DB_HOST','127.0.0.1').';port='.envv('DB_PORT','3306').';dbname='.envv('DB_NAME','futo_attendance').';charset=utf8mb4',envv('DB_USER','root'),envv('DB_PASS',''),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]); return $pdo; }
+session_name(envv('SESSION_NAME','futo_session')); session_set_cookie_params(['httponly'=>true,'samesite'=>'Lax','secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off']); if(session_status()!==PHP_SESSION_ACTIVE) session_start();
+function json_out($data,int $status=200): never { http_response_code($status); header('Content-Type: application/json; charset=utf-8'); echo json_encode($data,JSON_UNESCAPED_SLASHES); exit; }
+function body(): array { $raw=file_get_contents('php://input'); $data=json_decode($raw,true); return is_array($data)?$data:$_POST; }
+function user(): ?array { return $_SESSION['user'] ?? null; }
+function require_login(array $roles=[]): array { $u=user(); if(!$u) json_out(['ok'=>false,'error'=>'Unauthenticated'],401); if($roles && !in_array($u['role'],$roles,true)) json_out(['ok'=>false,'error'=>'Forbidden'],403); return $u; }
+function audit(string $action,string $entity,?int $entityId=null,?string $details=null): void { $u=user(); $s=db()->prepare('INSERT INTO audit_logs(actor_id,action,entity,entity_id,details) VALUES(?,?,?,?,?)'); $s->execute([$u['id']??null,$action,$entity,$entityId,$details]); }

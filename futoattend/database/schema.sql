@@ -1,0 +1,120 @@
+CREATE DATABASE IF NOT EXISTS futo_attendance CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE futo_attendance;
+
+CREATE TABLE users (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ login_id VARCHAR(100) NOT NULL UNIQUE,
+ password_hash VARCHAR(255) NOT NULL,
+ role ENUM('student','lecturer','admin') NOT NULL,
+ first_name VARCHAR(100) NOT NULL,
+ last_name VARCHAR(100) NOT NULL,
+ email VARCHAR(190) NULL,
+ phone VARCHAR(40) NULL,
+ department VARCHAR(150) NULL,
+ level VARCHAR(30) NULL,
+ active TINYINT(1) NOT NULL DEFAULT 1,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE courses (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ code VARCHAR(30) NOT NULL UNIQUE,
+ title VARCHAR(200) NOT NULL,
+ department VARCHAR(150) NULL,
+ semester VARCHAR(50) NULL,
+ planned_sessions INT UNSIGNED NOT NULL DEFAULT 17,
+ active TINYINT(1) NOT NULL DEFAULT 1,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE course_lecturers (
+ course_id BIGINT UNSIGNED NOT NULL,
+ lecturer_id BIGINT UNSIGNED NOT NULL,
+ PRIMARY KEY(course_id, lecturer_id),
+ FOREIGN KEY(course_id) REFERENCES courses(id),
+ FOREIGN KEY(lecturer_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE enrolments (
+ course_id BIGINT UNSIGNED NOT NULL,
+ student_id BIGINT UNSIGNED NOT NULL,
+ PRIMARY KEY(course_id, student_id),
+ FOREIGN KEY(course_id) REFERENCES courses(id),
+ FOREIGN KEY(student_id) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE venues (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ name VARCHAR(150) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE devices (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ device_code VARCHAR(80) NOT NULL UNIQUE,
+ name VARCHAR(150) NOT NULL,
+ venue_id BIGINT UNSIGNED NOT NULL,
+ ip_address VARCHAR(45) NULL,
+ port INT NOT NULL DEFAULT 4370,
+ active TINYINT(1) NOT NULL DEFAULT 1,
+ last_seen_at DATETIME NULL,
+ FOREIGN KEY(venue_id) REFERENCES venues(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE class_sessions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ course_id BIGINT UNSIGNED NOT NULL,
+ venue_id BIGINT UNSIGNED NOT NULL,
+ device_id BIGINT UNSIGNED NOT NULL,
+ session_date DATE NOT NULL,
+ start_time TIME NOT NULL,
+ end_time TIME NOT NULL,
+ cancelled TINYINT(1) NOT NULL DEFAULT 0,
+ closed TINYINT(1) NOT NULL DEFAULT 0,
+ FOREIGN KEY(course_id) REFERENCES courses(id),
+ FOREIGN KEY(venue_id) REFERENCES venues(id),
+ FOREIGN KEY(device_id) REFERENCES devices(id),
+ INDEX(session_date, start_time, end_time)
+) ENGINE=InnoDB;
+
+CREATE TABLE raw_punches (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ device_id BIGINT UNSIGNED NOT NULL,
+ device_user_id VARCHAR(100) NOT NULL,
+ punch_time DATETIME NOT NULL,
+ device_record_key VARCHAR(190) NOT NULL UNIQUE,
+ received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(device_id) REFERENCES devices(id),
+ INDEX(device_user_id, punch_time)
+) ENGINE=InnoDB;
+
+CREATE TABLE attendance (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ session_id BIGINT UNSIGNED NOT NULL,
+ student_id BIGINT UNSIGNED NOT NULL,
+ status ENUM('Present','Late','Absent','Excused') NOT NULL,
+ punch_id BIGINT UNSIGNED NULL,
+ source ENUM('DEVICE','SYSTEM','MANUAL') NOT NULL DEFAULT 'DEVICE',
+ correction_reason VARCHAR(500) NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY one_student_session(session_id, student_id),
+ FOREIGN KEY(session_id) REFERENCES class_sessions(id),
+ FOREIGN KEY(student_id) REFERENCES users(id),
+ FOREIGN KEY(punch_id) REFERENCES raw_punches(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE settings (
+ setting_key VARCHAR(100) PRIMARY KEY,
+ setting_value VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE audit_logs (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ actor_id BIGINT UNSIGNED NULL,
+ action VARCHAR(100) NOT NULL,
+ entity VARCHAR(100) NOT NULL,
+ entity_id BIGINT UNSIGNED NULL,
+ details TEXT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(actor_id) REFERENCES users(id)
+) ENGINE=InnoDB;
